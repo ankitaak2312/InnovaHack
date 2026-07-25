@@ -8,8 +8,8 @@ __pycache__/
 *.egg-info/
 
 # Model artifacts
-*.pkl
 *.joblib
+!model.pkl
 
 # Env files
 .env
@@ -17,7 +17,3 @@ __pycache__/
 # OS/editor junk
 .DS_Store
 .vscode/
-.idea/
-
-# Node (for the extension side, once that starts)
-node_modules/
