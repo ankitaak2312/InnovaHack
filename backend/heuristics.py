@@ -11,6 +11,32 @@ IP_PATTERN = re.compile(
     r"^(\d{1,3}\.){3}\d{1,3}$"
 )
 
+# Registrable-domain labels (no TLD) for high-value brands commonly impersonated
+# in phishing campaigns. Used for typosquat/lookalike detection below.
+TRUSTED_BRANDS = [
+    "paypal", "amazon", "google", "microsoft", "apple", "netflix",
+    "facebook", "instagram", "linkedin", "github", "dropbox", "adobe",
+    "bankofamerica", "chase", "wellsfargo", "hdfcbank", "icicibank", "sbi",
+]
+
+# TLD suffixes that span two labels (e.g. "example.co.uk"), so the
+# registrable label sits three parts from the end rather than two.
+TWO_PART_SUFFIXES = {"co.uk", "com.au", "co.in", "com.br", "co.jp", "co.nz"}
+
+# Max distance considered a "close call" typosquat rather than an unrelated domain.
+TYPOSQUAT_MAX_DISTANCE = 2
+
+# Known-legitimate domains that happen to sit within TYPOSQUAT_MAX_DISTANCE of
+# a trusted brand (e.g. 'gitlab' vs 'github', distance 2) but are real,
+# unrelated services rather than impersonation attempts. Edit distance alone
+# can't tell "two different real words" apart from "one character swapped in
+# the same word" — this allowlist is the safety net for that gap.
+KNOWN_SAFE_DOMAINS = {
+    "gitlab", "airbnb", "telegram", "reddit", "notion", "figma",
+    "spotify", "stripe", "slack", "discord", "medium", "twitch",
+    "pinterest", "wordpress",
+}
+
 def has_ip_address(url):
     hostname = urlparse(url).hostname
     if hostname is None:
@@ -32,6 +58,75 @@ def has_suspicious_keywords(url):
     found = [kw for kw in SUSPICIOUS_KEYWORDS if kw in lowered]
     return found
 
+def levenshtein_distance(a, b):
+    """Standard edit-distance DP: minimum single-character insertions,
+    deletions, or substitutions to turn `a` into `b`."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+
+    prev_row = list(range(len(b) + 1))
+    for i, char_a in enumerate(a, start=1):
+        curr_row = [i] + [0] * len(b)
+        for j, char_b in enumerate(b, start=1):
+            cost = 0 if char_a == char_b else 1
+            curr_row[j] = min(
+                prev_row[j] + 1,        # deletion
+                curr_row[j - 1] + 1,    # insertion
+                prev_row[j - 1] + cost  # substitution
+            )
+        prev_row = curr_row
+    return prev_row[-1]
+
+def get_domain_label(url):
+    """Extract the registrable-domain label (no TLD, no subdomains) from a URL.
+    e.g. 'https://www.paypa1-secure.tk/x' -> 'paypa1-secure' """
+    hostname = urlparse(url).hostname
+    if not hostname:
+        return ""
+    parts = hostname.lower().split(".")
+    if len(parts) < 2:
+        return hostname.lower()
+
+    last_two = ".".join(parts[-2:])
+    if last_two in TWO_PART_SUFFIXES and len(parts) >= 3:
+        return parts[-3]
+    return parts[-2]
+
+def check_typosquatting(url):
+    """Flag domains that are a small edit distance away from a known trusted
+    brand's domain but are NOT an exact or substring match — catching
+    character-substitution tricks (e.g. 'paypa1', 'arnazon', 'gogle') that
+    plain keyword matching misses because the brand name isn't literally
+    present. Checks each hyphen/underscore-separated token individually so
+    compound domains like 'paypa1-secure.tk' or 'microsft-support.click'
+    are still caught, not just single-word lookalikes."""
+    label = get_domain_label(url)
+    if not label:
+        return None
+
+    tokens = [t for t in re.split(r"[-_0-9]+", label) if t] or [label]
+    # Also check the raw hyphen/underscore-split tokens (keeps leading digits
+    # like the '1' in 'paypa1' attached, since splitting on digits above would
+    # separate 'paypa' from '1' and still catch it via the digit-stripped token).
+    tokens += [t for t in re.split(r"[-_]+", label) if t]
+
+    for token in tokens:
+        if token in KNOWN_SAFE_DOMAINS:
+            continue
+        for brand in TRUSTED_BRANDS:
+            if token == brand or brand in token:
+                continue  # exact or substring match is handled by keyword check
+            if abs(len(token) - len(brand)) > TYPOSQUAT_MAX_DISTANCE:
+                continue  # too different in length to be a plausible typo
+            distance = levenshtein_distance(token, brand)
+            if 0 < distance <= TYPOSQUAT_MAX_DISTANCE:
+                return brand
+    return None
+
 def run_heuristics(url):
     flags = []
 
@@ -48,6 +143,13 @@ def run_heuristics(url):
     if keywords_found:
         flags.append(f"URL contains suspicious keywords: {', '.join(keywords_found)}")
 
+    impersonated_brand = check_typosquatting(url)
+    if impersonated_brand:
+        flags.append(
+            f"Domain closely resembles the trusted brand '{impersonated_brand}' "
+            f"(possible typosquatting)"
+        )
+
     score = len(flags) * 25
     score = min(score, 100)
 
@@ -62,7 +164,11 @@ if __name__ == "__main__":
         "https://www.google.com",
         "http://192.168.1.1/login",
         "https://secure-login.paypal-verify-account.com.suspicious.tk",
-        "http://update-your-account.banking-confirm.xyz"
+        "http://update-your-account.banking-confirm.xyz",
+        "http://paypa1-secure.tk/confirm",
+        "http://www.arnazon.com/deals",
+        "https://gogle.com",
+        "http://microsft-support.click",
     ]
 
     for test_url in test_urls:

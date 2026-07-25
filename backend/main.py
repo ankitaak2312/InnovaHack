@@ -56,8 +56,11 @@ def _risk_level(score: float) -> str:
 
 
 def _simplify_flag(flag: str) -> str:
-    """Strip the leading 'URL ' so flags read naturally after 'because ...'."""
-    return flag[4:] if flag.startswith("URL ") else flag
+    """Strip a leading 'URL ' or 'Domain ' so flags read naturally after 'because it ...'."""
+    for prefix in ("URL ", "Domain "):
+        if flag.startswith(prefix):
+            return flag[len(prefix):]
+    return flag
 
 
 def build_explanation(risk_level: str, flags: list[str], ml_score: float) -> str:
@@ -69,7 +72,10 @@ def build_explanation(risk_level: str, flags: list[str], ml_score: float) -> str
         # Heuristics found nothing, but the ML model alone is suspicious.
         return f"The ML classifier rated this URL as high-risk ({ml_score:.0f}% confidence), though no structural red flags were found."
 
-    reasons = [_simplify_flag(f) for f in flags[:2]]
+    # Surface the typosquat flag first when present — it's the most specific,
+    # actionable signal and shouldn't get crowded out by generic keyword flags.
+    prioritized = sorted(flags, key=lambda f: 0 if "typosquatting" in f else 1)
+    reasons = [_simplify_flag(f) for f in prioritized[:2]]
     joined = " and ".join(reasons)
     prefix = "Flagged as phishing" if risk_level == "phishing" else "Flagged as suspicious"
     return f"{prefix} because it {joined}."
