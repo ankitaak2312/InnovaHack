@@ -15,22 +15,26 @@ document.getElementById("scanBtn").addEventListener("click", () => {
     if (!response || response.error) {
       gaugeDiv.className = "gauge phishing";
       riskScoreDiv.textContent = "!";
-      riskLevelDiv.textContent = "ERROR";
-      explanationDiv.innerHTML = response ? response.error : "Something went wrong";
+      riskLevelDiv.textContent = response && response.error ? response.error : "ERROR";
+      const detail =
+        response && response.detail
+          ? response.detail
+          : "Something went wrong. Please try again.";
+      explanationDiv.innerHTML = `<p class="explanation-text">${detail}</p>`;
       return;
     }
 
-    const { risk_score, risk_level, flags } = response.data;
+    const { risk_score, risk_level, explanation, flags } = response.data;
 
     gaugeDiv.className = `gauge ${risk_level}`;
     riskScoreDiv.textContent = risk_score;
     riskLevelDiv.textContent = risk_level;
 
+    let html = `<p class="explanation-text">${explanation}</p>`;
     if (flags && flags.length > 0) {
       const listItems = flags.map((flag) => `<li>${flag}</li>`).join("");
-      explanationDiv.innerHTML = `<ul>${listItems}</ul>`;
-    } else {
-      explanationDiv.innerHTML = "No red flags detected.";
+      html += `<ul>${listItems}</ul>`;
     }
+    explanationDiv.innerHTML = html;
   });
 });
