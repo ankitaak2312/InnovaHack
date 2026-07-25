@@ -41,14 +41,55 @@ h1 {
   display: none;
 }
 
+.gauge {
+  border-radius: 12px;
+  padding: 16px;
+  transition: background-color 0.3s ease;
+  background-color: #9ca3af;
+}
+
+.gauge.safe {
+  background-color: #22c55e;
+}
+
+.gauge.warning {
+  background-color: #eab308;
+}
+
+.gauge.phishing {
+  background-color: #ef4444;
+}
+
 .risk-score {
   font-size: 32px;
   font-weight: 700;
-  color: #111827;
+  color: #ffffff;
+}
+
+.risk-level {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ffffff;
 }
 
 .explanation {
-  margin-top: 8px;
+  margin-top: 12px;
   font-size: 13px;
-  color: #4b5563;
+  color: #374151;
+  text-align: left;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.explanation ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.explanation li {
+  margin-bottom: 4px;
 }
