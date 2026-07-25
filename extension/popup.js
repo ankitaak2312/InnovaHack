@@ -15,8 +15,12 @@ document.getElementById("scanBtn").addEventListener("click", () => {
     if (!response || response.error) {
       gaugeDiv.className = "gauge phishing";
       riskScoreDiv.textContent = "!";
-      riskLevelDiv.textContent = "ERROR";
-      explanationDiv.innerHTML = response ? response.error : "Something went wrong";
+      riskLevelDiv.textContent = response && response.error ? response.error : "ERROR";
+      const detail =
+        response && response.detail
+          ? response.detail
+          : "Something went wrong. Please try again.";
+      explanationDiv.innerHTML = `<p class="explanation-text">${detail}</p>`;
       return;
     }
 
