@@ -1,0 +1,23 @@
+# Python virtual environments
+venv/
+env/
+*/venv/
+*/env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Model artifacts
+*.pkl
+*.joblib
+
+# Env files
+.env
+
+# OS/editor junk
+.DS_Store
+.vscode/
+.idea/
+
+# Node (for the extension side, once that starts)
+node_modules/
