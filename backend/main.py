@@ -44,6 +44,7 @@ class AnalyzeResponse(BaseModel):
     heuristic_score: float
     ml_score: float
     flags: list[str]
+    explanation: str
 
 
 def _risk_level(score: float) -> str:
@@ -52,6 +53,26 @@ def _risk_level(score: float) -> str:
     if score < 60:
         return "warning"
     return "phishing"
+
+
+def _simplify_flag(flag: str) -> str:
+    """Strip the leading 'URL ' so flags read naturally after 'because ...'."""
+    return flag[4:] if flag.startswith("URL ") else flag
+
+
+def build_explanation(risk_level: str, flags: list[str], ml_score: float) -> str:
+    """Turn the raw heuristic flags + ML confidence into one short, readable sentence."""
+    if risk_level == "safe":
+        return "No red flags detected — this URL looks safe."
+
+    if not flags:
+        # Heuristics found nothing, but the ML model alone is suspicious.
+        return f"The ML classifier rated this URL as high-risk ({ml_score:.0f}% confidence), though no structural red flags were found."
+
+    reasons = [_simplify_flag(f) for f in flags[:2]]
+    joined = " and ".join(reasons)
+    prefix = "Flagged as phishing" if risk_level == "phishing" else "Flagged as suspicious"
+    return f"{prefix} because it {joined}."
 
 
 @app.get("/")
@@ -79,13 +100,17 @@ def analyze_url(payload: AnalyzeRequest):
     combined_score = (HEURISTIC_WEIGHT * heuristic_score) + (ML_WEIGHT * ml_score)
     combined_score = round(min(max(combined_score, 0), 100), 2)
 
+    risk_level = _risk_level(combined_score)
+    flags = heuristic_result["flags"]
+
     return AnalyzeResponse(
         url=url,
         risk_score=combined_score,
-        risk_level=_risk_level(combined_score),
+        risk_level=risk_level,
         heuristic_score=heuristic_score,
         ml_score=round(ml_score, 2),
-        flags=heuristic_result["flags"],
+        flags=flags,
+        explanation=build_explanation(risk_level, flags, ml_score),
     )
 
 
