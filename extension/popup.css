@@ -1,0 +1,54 @@
+body {
+  width: 300px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #ffffff;
+  margin: 0;
+}
+
+.container {
+  padding: 16px;
+}
+
+h1 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: #111827;
+}
+
+#scanBtn {
+  width: 100%;
+  padding: 10px;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#scanBtn:hover {
+  background-color: #1d4ed8;
+}
+
+.result {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.hidden {
+  display: none;
+}
+
+.risk-score {
+  font-size: 32px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.explanation {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #4b5563;
+}
