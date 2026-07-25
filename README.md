@@ -2,7 +2,7 @@
 
 **InnovaHack Chapter-1 | Domain: Cybersecurity | Problem Statement 2**
 
-PhishGuard is a browser extension that analyzes the URL of the page you're currently viewing and returns a real-time risk score, flagging phishing attempts using a combination of rule-based heuristics and a trained machine learning classifier — with a plain-English explanation of *why* a link was flagged.
+PhishGuard is a browser extension that analyzes the URL of the page you're currently viewing and returns a real-time risk score, flagging phishing attempts using a combination of rule-based heuristics, brand-impersonation detection, and a trained machine learning classifier — with a plain-English explanation of *why* a link was flagged.
 
 **Live API:** https://innovahack-8q1t.onrender.com
 **Live API docs (Swagger UI):** https://innovahack-8q1t.onrender.com/docs
@@ -13,11 +13,11 @@ PhishGuard is a browser extension that analyzes the URL of the page you're curre
 
 ## The Problem
 
-Phishing remains one of the most common entry points for cyberattacks, and most people have no quick way to tell whether a link is safe before clicking. Traditional blocklists only catch known bad URLs and miss new or slightly-varied attacks.
+Phishing remains one of the most common entry points for cyberattacks, and most people have no quick way to tell whether a link is safe before clicking. Traditional blocklists only catch known bad URLs and miss new, slightly-varied, or subtly misspelled attacks.
 
 ## Our Approach
 
-Instead of relying on a static blocklist, PhishGuard combines two independent signals into one score:
+Instead of relying on a static blocklist, PhishGuard combines three independent signals into one score:
 
 1. **Heuristics engine** — checks the URL's structure directly for known red flags (no ML needed to catch these):
    - IP address used instead of a domain name
@@ -25,9 +25,11 @@ Instead of relying on a static blocklist, PhishGuard combines two independent si
    - Excessive number of subdomains
    - Suspicious keywords (`login`, `verify`, `secure`, `banking`, `urgent`, `suspended`, etc.)
 
-2. **ML classifier (Random Forest)** — trained on a synthetic dataset of safe vs. phishing-style URLs, using 12 numeric features per URL (length, dot/hyphen/digit counts, subdomain count, IP usage, HTTPS presence, `@` symbol presence, suspicious keyword count, shortener detection, path length, query param count). This catches subtler patterns that fixed rules alone would miss.
+2. **Typosquat / brand-impersonation detector** — most phishing tools only catch a brand name if it's spelled correctly. We catch the misspelling itself. Using Levenshtein edit distance, PhishGuard flags domains that are a small character-edit away from a trusted brand (e.g. `arnazon.com`, `paypa1-secure.tk`, `gogle.com`, `microsft-support.click`) even when the brand name isn't literally present as a substring. A small allowlist of known-legitimate lookalikes (e.g. `gitlab.com`, which sits close to `github` in edit distance but is an unrelated real product) keeps this from crying wolf on genuine sites.
 
-The two scores are blended 50/50 into a single 0–100 risk score, bucketed into **Safe / Warning / Phishing**, and paired with a short, human-readable explanation of the top reasons behind the score.
+3. **ML classifier (Random Forest)** — trained on a synthetic dataset of safe vs. phishing-style URLs, using 12 numeric features per URL (length, dot/hyphen/digit counts, subdomain count, IP usage, HTTPS presence, `@` symbol presence, suspicious keyword count, shortener detection, path length, query param count). This catches subtler patterns that fixed rules alone would miss.
+
+The heuristic signals (structural + typosquat) and the ML confidence are blended 50/50 into a single 0–100 risk score, bucketed into **Safe / Warning / Phishing**, and paired with a short, human-readable explanation of the top reasons behind the score — prioritizing the typosquat reason when present, since it's the most specific and actionable signal.
 
 ```
 combined_score = 0.5 × heuristic_score + 0.5 × ml_confidence
@@ -42,7 +44,9 @@ combined_score = 0.5 × heuristic_score + 0.5 × ml_confidence
 │                      │◀──────────────────────────── │                          │
 │  popup.html/js/css   │   { risk_score, risk_level,   │  ┌────────────────────┐  │
 │  background.js       │     explanation, flags }      │  │ heuristics.py      │  │
-└─────────────────────┘                               │  └────────────────────┘  │
+└─────────────────────┘                               │  │ (structural +      │  │
+                                                        │  │  typosquat checks) │  │
+                                                        │  └────────────────────┘  │
                                                         │  ┌────────────────────┐  │
                                                         │  │ ml/ (RandomForest) │  │
                                                         │  └────────────────────┘  │
@@ -52,7 +56,7 @@ combined_score = 0.5 × heuristic_score + 0.5 × ml_confidence
 **Flow:**
 1. User clicks "Scan Current Tab" in the extension popup.
 2. `background.js` grabs the active tab's URL and POSTs it to `/analyze`.
-3. The backend runs both the heuristics module and the ML model on the URL, blends the scores, and returns a risk level + explanation.
+3. The backend runs the heuristics module (structural checks + typosquat detection) and the ML model on the URL, blends the scores, and returns a risk level + explanation.
 4. `popup.js` renders a color-coded gauge (green/yellow/red) and the explanation text.
 
 ## Tech Stack
@@ -70,7 +74,7 @@ combined_score = 0.5 × heuristic_score + 0.5 × ml_confidence
 InnovaHack-main/
 ├── backend/
 │   ├── main.py              # FastAPI app, /analyze endpoint, score blending
-│   ├── heuristics.py         # Rule-based structural red-flag checks
+│   ├── heuristics.py         # Rule-based structural checks + typosquat detector
 │   ├── model.pkl              # Trained Random Forest bundle (model + feature names)
 │   ├── ml/
 │   │   ├── features.py       # Shared feature extraction (training + live API)
@@ -115,22 +119,22 @@ By default the extension points at the deployed Render API. To test against a lo
 ### `POST /analyze`
 **Request:**
 ```json
-{ "url": "http://secure-paypal-login.tk/confirm" }
+{ "url": "http://gogle.com/login" }
 ```
 
 **Response:**
 ```json
 {
-  "url": "http://secure-paypal-login.tk/confirm",
-  "risk_score": 87.5,
+  "url": "http://gogle.com/login",
+  "risk_score": 73.75,
   "risk_level": "phishing",
-  "heuristic_score": 75.0,
-  "ml_score": 100.0,
+  "heuristic_score": 50.0,
+  "ml_score": 97.5,
   "flags": [
     "URL does not use HTTPS",
-    "URL contains suspicious keywords: login, secure, confirm"
+    "Domain closely resembles the trusted brand 'google' (possible typosquatting)"
   ],
-  "explanation": "Flagged as phishing because it does not use HTTPS and contains suspicious keywords: login, secure, confirm."
+  "explanation": "Flagged as phishing because it closely resembles the trusted brand 'google' (possible typosquatting) and does not use HTTPS."
 }
 ```
 
@@ -140,13 +144,14 @@ Basic liveness check, returns `{ "status": "ok" }`.
 ## Known Limitations & Next Steps
 
 - The ML model is trained on a **synthetic dataset** (structurally generated, not real crawled phishing data). Swapping in a real labeled dataset (e.g. PhishTank + Tranco top sites) is the natural next step and requires no changes outside `generate_dataset.py`.
+- The typosquat detector checks against a curated list of ~18 high-value brands; extending this list (or generating it from a live "most-impersonated brands" feed) would widen coverage.
 - CORS is currently open (`allow_origins=["*"]`) for hackathon convenience; a production version would restrict this to the extension's origin.
 - Currently scans URLs only; the problem statement also mentions email scanning as a stretch goal, which is a natural extension via a Gmail/Outlook add-in reusing the same `/analyze` endpoint.
 - Free-tier hosting means occasional cold-start delays (30–50s) on first use after idle time.
 
 ## Team
 
-- Team Name: *Invictus*
-- Team Leader: *Sanjana Baid*
-- Team Members: *Ankita Kumari, Sanjana Baid*
+- Team Name: Invictus
+- Team Leader: Sanjana Baid
+- Team Members: Ankita Kumari, Sanjana Baid
 - Track / Problem Statement: Domain 2 — Cybersecurity, Problem Statement 2 (Phishing & Malicious URL Detector)
