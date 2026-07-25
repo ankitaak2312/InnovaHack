@@ -146,7 +146,7 @@ Basic liveness check, returns `{ "status": "ok" }`.
 
 ## Team
 
-- Team Name: *[add here]*
-- Team Leader: *[add here]*
-- Team Members: *[add here]*
+- Team Name: *Invictus*
+- Team Leader: *Sanjana Baid*
+- Team Members: *Ankita Kumari, Sanjana Baid*
 - Track / Problem Statement: Domain 2 — Cybersecurity, Problem Statement 2 (Phishing & Malicious URL Detector)
