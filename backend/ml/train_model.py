@@ -1,10 +1,4 @@
-"""
-Trains a RandomForestClassifier on the synthetic phishing/safe URL dataset
-and saves it to backend/model.pkl.
 
-Run from the backend/ directory:
-    python -m ml.train_model
-"""
 import os
 
 import joblib

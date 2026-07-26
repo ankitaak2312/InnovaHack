@@ -11,26 +11,19 @@ IP_PATTERN = re.compile(
     r"^(\d{1,3}\.){3}\d{1,3}$"
 )
 
-# Registrable-domain labels (no TLD) for high-value brands commonly impersonated
-# in phishing campaigns. Used for typosquat/lookalike detection below.
+
 TRUSTED_BRANDS = [
     "paypal", "amazon", "google", "microsoft", "apple", "netflix",
     "facebook", "instagram", "linkedin", "github", "dropbox", "adobe",
     "bankofamerica", "chase", "wellsfargo", "hdfcbank", "icicibank", "sbi",
 ]
 
-# TLD suffixes that span two labels (e.g. "example.co.uk"), so the
-# registrable label sits three parts from the end rather than two.
+
 TWO_PART_SUFFIXES = {"co.uk", "com.au", "co.in", "com.br", "co.jp", "co.nz"}
 
-# Max distance considered a "close call" typosquat rather than an unrelated domain.
 TYPOSQUAT_MAX_DISTANCE = 2
 
-# Known-legitimate domains that happen to sit within TYPOSQUAT_MAX_DISTANCE of
-# a trusted brand (e.g. 'gitlab' vs 'github', distance 2) but are real,
-# unrelated services rather than impersonation attempts. Edit distance alone
-# can't tell "two different real words" apart from "one character swapped in
-# the same word" — this allowlist is the safety net for that gap.
+
 KNOWN_SAFE_DOMAINS = {
     "gitlab", "airbnb", "telegram", "reddit", "notion", "figma",
     "spotify", "stripe", "slack", "discord", "medium", "twitch",
@@ -74,9 +67,9 @@ def levenshtein_distance(a, b):
         for j, char_b in enumerate(b, start=1):
             cost = 0 if char_a == char_b else 1
             curr_row[j] = min(
-                prev_row[j] + 1,        # deletion
-                curr_row[j - 1] + 1,    # insertion
-                prev_row[j - 1] + cost  # substitution
+                prev_row[j] + 1,        
+                curr_row[j - 1] + 1,   
+                prev_row[j - 1] + cost  
             )
         prev_row = curr_row
     return prev_row[-1]
@@ -109,9 +102,6 @@ def check_typosquatting(url):
         return None
 
     tokens = [t for t in re.split(r"[-_0-9]+", label) if t] or [label]
-    # Also check the raw hyphen/underscore-split tokens (keeps leading digits
-    # like the '1' in 'paypa1' attached, since splitting on digits above would
-    # separate 'paypa' from '1' and still catch it via the digit-stripped token).
     tokens += [t for t in re.split(r"[-_]+", label) if t]
 
     for token in tokens:
@@ -119,9 +109,9 @@ def check_typosquatting(url):
             continue
         for brand in TRUSTED_BRANDS:
             if token == brand or brand in token:
-                continue  # exact or substring match is handled by keyword check
+                continue  
             if abs(len(token) - len(brand)) > TYPOSQUAT_MAX_DISTANCE:
-                continue  # too different in length to be a plausible typo
+                continue  
             distance = levenshtein_distance(token, brand)
             if 0 < distance <= TYPOSQUAT_MAX_DISTANCE:
                 return brand

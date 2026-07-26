@@ -14,8 +14,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
-      // Render free-tier instances spin down when idle, so a cold start can
-      // take 50+ seconds. Give it a generous timeout before giving up.
       const REQUEST_TIMEOUT_MS = 25000;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

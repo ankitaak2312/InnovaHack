@@ -1,8 +1,4 @@
-"""
-URL feature extraction shared by the training script (train_model.py) and,
-later, the /analyze scoring endpoint (Step 5) so the live API extracts
-features exactly the same way the model was trained on.
-"""
+
 import re
 from urllib.parse import urlparse
 
